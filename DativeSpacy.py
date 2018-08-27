@@ -38,7 +38,7 @@ Steps-
 """
 
 
-
+import spacy
 import re
 import sys
 import os
@@ -49,7 +49,7 @@ import time
 cwd = os.getcwd()
 CORPORA_FILES = cwd + "/WLP_CorpusFiles"
 TEST_FILES = cwd + "/WLP_TestFiles"
-WORKING_FILES=CORPORA_FILES
+WORKING_FILES=TEST_FILES
 
 window=5 #sets window - eg window=5 would grab the 5 words before and after target word
 
@@ -167,7 +167,7 @@ def searchTgt(doc, docDict, LegalSyntaxList, SKIP_CHARS):
 	# 	WordColIndex=0
 	# 	curWord=curLine[WordColIndex]
 	# 	print curPOS
-	outputFile=open("C:\Users\mzbor\Desktop\COCA\Scripts\Scripts\DativeSearch\Output/"+doc[2][-2], "a")  ####NEED TO REMANE THIS UNIQUE TO THE SPECIFIC FILE
+	outputFile=open(cwd+"\Output/"+doc[2][-2], "a")  ####NEED TO REMANE THIS UNIQUE TO THE SPECIFIC FILE
 	matches=[]
 	for curLine in doc:
 		curContext=[]

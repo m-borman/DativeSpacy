@@ -1,0 +1,4 @@
+VDNPDN,identify(vvi) the(at) source(nn1) of(io) any(dd) market(nn1)
+VDNPNNVD,examine(vv0) the(at) impact(nn1) of(io) name(nn1) changes(nn2) using(vvg) a(at1)
+VDJNPNNP,using(vvg) a(at1) large(jj) sample(nn1) of(io) life(nn1) insurers(nn2) for(if)
+VNNVDJJN,capture(vv0) consumer(nn1) heterogeneity(nn1) using(vvg) the(at) hierarchical(jj) bayesian(jj) regression(nn1)
