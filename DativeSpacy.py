@@ -45,11 +45,12 @@ import os
 import glob
 import time
 
+nlp = spacy.load('en_core_web_sm')
 ### Initialization of corpora
 cwd = os.getcwd()
 CORPORA_FILES = cwd + "/WLP_CorpusFiles"
 TEST_FILES = cwd + "/WLP_TestFiles"
-WORKING_FILES=TEST_FILES
+WORKING_FILES=CORPUS_FILES
 
 window=5 #sets window - eg window=5 would grab the 5 words before and after target word
 
@@ -86,7 +87,7 @@ TARGET_INDEX=LEMMA_INDEX
 TAG_LIST=["PREP_TAGS", "NOUN_TAGS",]
 
 
-
+legalDependencies=[u"nsubj dative dobj", u"nsubj dobj pobj"]
 
 ### Custom file opening function
 def openFile(filename, characteristic, new = False):
@@ -161,8 +162,11 @@ def searchTgt(doc, docDict, LegalSyntaxList, SKIP_CHARS):
 	wlpLen=5
 	regLen=7
 	context = []
-	sentLen=8
+	windowBack=3
+	windowForward=8
+	sentLen=8 # num of words beyond the verb that the script will collect
 	maxIndex= max(k for k, v in docDict.iteritems() if v != 0)
+	print maxIndex
 	# for curLine in doc:
 	# 	WordColIndex=0
 	# 	curWord=curLine[WordColIndex]
@@ -179,96 +183,171 @@ def searchTgt(doc, docDict, LegalSyntaxList, SKIP_CHARS):
 			wordColIndex=0
 			lemmaColIndex=1
 			POSColIndex=2			
-		if len(curLine)>3 and type(curLine[-1]) == int and (curLine[-1]-maxIndex)<-5:  # MAY NEED TO ADD A CLAUSE HERE TO EXCLUSE FIRST 20 or so lines of file...
+		if len(curLine)>3 and type(curLine[-1]) == int and (curLine[-1]-maxIndex)<-sentLen and curLine[-1]>windowForward:  # MAY NEED TO ADD A CLAUSE HERE TO EXCLUSE FIRST 20 or so lines of file...
 
 			curPOS=curLine[POSColIndex]
 			output=[]
 			curWord=curLine[wordColIndex]
 			if curPOS in VERB_TAGS:
 				# print str(curWord)+" POS:"+str(curPOS)
-				tgtIndex=curLine[-1]
-				sentIndices=[tgtIndex+num for num in range(0,sentLen)]  # Creates a list of the indices for the 5 words following the verb
 				
-				# wordsList=[docDict[item][wordColIndex], docDict[item][POSColIndex] for item in sentIndices}]
-				# print wordsList
-
-				for item in sentIndices:
-					word_POS=[]
-					word_POS.extend((docDict[item][wordColIndex], docDict[item][POSColIndex]))
-
-					# curContext.append(word_POS)
-					if docDict[item][POSColIndex] in VERB_TAGS:
-						word_POS.extend('V')
-
-					elif docDict[item][POSColIndex] in NOUN_TAGS:
-						word_POS.extend('N')
-					elif docDict[item][POSColIndex] in DET_TAGS:
-						word_POS.extend('D')
-					elif docDict[item][POSColIndex] in ADJ_TAGS:
-						word_POS.extend('J')
-					elif docDict[item][POSColIndex] in PREP_TAGS:
-						word_POS.extend('P')
-					else:
-						word_POS.extend('X')
-						break   ### IF POS not in one of the above bins, THIS ENDS THE LOGGING OF POS 
-					# if word_POS.count('N') ==2:
-
-
-
-					curContext.append(word_POS)
-				
-				testIndices=[i for i in range(1,9)]
+				############## SPLICING INDEX SEARCH
 				
 
-				# print curContext
-				# 	curContext.append(str(docDict[item][wordColIndex])+"/"+str(docDict[item][POSColIndex])
-				sentDict=dict(zip(testIndices, curContext)) #
-				# sentSyntax=[i for i in sentDict[i][2]]
-				sentSyntax=[]
+				tgtIndex=curLine[-1] #this is the index of the current word within the corpus file, assigned when the corpus file was imported
 
-				for i in range (1,len(sentDict)+1):  #Gives the items in the syntax a number in order and adds it to its dictionary entry
-					sentSyntax.extend(sentDict[i][2])
-				# if sentSyntax[1]=="P":
-				# 	break
-				# for item in sentSyntax:
-				# 	", ".join(map(item, sentSyntax))
-				sentSyntax=",".join(sentSyntax)
+
+				bumpFor=0
+				bumpBack=0
+				contextIndices=[tgtIndex+num for num in range((-windowBack) ,windowForward)]
+
+				skipIndices=[]
+				contextCounter=0
+				okIndices=[]
+				print tgtIndex
+				for contextIndex in contextIndices:
+					###Make a new function that recalculates the context indices?
+					if contextIndex not in skipIndices:
+
+						contextWord=docDict[contextIndex][wordColIndex]
+						if contextWord not in SKIP_CHARS:
+							okIndices.append(contextIndex)
+
+						else:
+							if contextIndex-tgtIndex<0:
+								bumpBack+=1
+								skipIndices.append(contextIndex)
+								addedIndex=tgtIndex-window-bumpBack
+								contextIndices.append(addedIndex)
+							if contextIndex-tgtIndex>0:
+								bumpFor+=1
+								skipIndices.append(contextIndex)
+								contextIndices.append(tgtIndex+window+bumpFor)
+				okLabels=[]		
+				for item in okIndices:
+					okLabels.append(docDict[item][-1])
 				
-				# print type(sentSyntax)
-				# print type(sentSyntax[0])
-				# sentSyntax.strip(["'"])					
-				# print sentSyntax
-				# print sentDict
-				if any(item in sentSyntax for item in LegalSyntaxList):
-					
-					if sentSyntax[1]!="P":
-						wordPOSlist=[]
-						for item in curContext:
-							for x, word in enumerate(item):
-								
-							
-								if x==1:
-									
-									tempPOS=word
-									tempPOS="("+word+")"
-									wordPOSlist.append(tempPOS)
-								if x==0:
-									wordPOSlist.append(word)
+				okIndices.sort()
+				contextWords=[]
+				for item in okIndices:
+					contextWords.append(docDict[item][wordColIndex])
+				contextWords=' '.join(contextWords)
 
-						wordPOSlist=" ".join(wordPOSlist)
-						wordPOSlist=wordPOSlist.replace(" (", "(")
-						strippedSyntax=sentSyntax.replace(",","")
+				contextWords=contextWords
+				if len(curLine)<6:
+					tgtLabel='none'
+				else:
+					tgtLabel=docDict[tgtIndex][1]
+				tgtWord=docDict[tgtIndex][wordColIndex]
+				corpFile=docDict[tgtIndex][-2]
+				# output=corpFile+', '+tgtLabel+', '+tgtWord+', '+contextWords
+				wordOutput=contextWords
+				uniWordOutput=wordOutput.decode('utf-8')
+				doc = nlp(uniWordOutput)
+				chunks=[]
+				for chunk in doc.noun_chunks:
+					chunks.append(chunk.root.dep_)
+				dependency=' '.join(chunks)
+				
+				
 
-						matches.append(sentSyntax)
-						output=strippedSyntax+","+wordPOSlist+'\n'
-						outputFile.write(str(output))
-
-					# print curContext
-					# print sentSyntax[2:]
-
+				if any(item in dependency for item in legalDependencies):
+					print "ok"
+					outputToFile=contextWords+dependency+'\n'
+					print outputToFile
+					outputFile.write(outputToFile)
 	timeEndFile=time.time()
 	timeElapsed=str(timeEndFile-startTime)			
-	print "Analyzed in:"+timeElapsed+" seconds"
+	print "Parsed in:"+timeElapsed+" seconds"
+
+
+
+				####END INDEX SEARCH SPLICE
+
+
+	# 			tgtIndex=curLine[-1]
+	# 			sentIndices=[tgtIndex+num for num in range(0,sentLen)]  # Creates a list of the indices for the 5 words following the verb
+				
+	# 			# wordsList=[docDict[item][wordColIndex], docDict[item][POSColIndex] for item in sentIndices}]
+	# 			# print wordsList
+
+	# 			for item in sentIndices:
+	# 				word_POS=[]
+	# 				word_POS.extend((docDict[item][wordColIndex], docDict[item][POSColIndex]))
+
+	# 				# curContext.append(word_POS)
+	# 				if docDict[item][POSColIndex] in VERB_TAGS:
+	# 					word_POS.extend('V')
+
+	# 				elif docDict[item][POSColIndex] in NOUN_TAGS:
+	# 					word_POS.extend('N')
+	# 				elif docDict[item][POSColIndex] in DET_TAGS:
+	# 					word_POS.extend('D')
+	# 				elif docDict[item][POSColIndex] in ADJ_TAGS:
+	# 					word_POS.extend('J')
+	# 				elif docDict[item][POSColIndex] in PREP_TAGS:
+	# 					word_POS.extend('P')
+	# 				else:
+	# 					word_POS.extend('X')
+	# 					break   ### IF POS not in one of the above bins, THIS ENDS THE LOGGING OF POS 
+	# 				# if word_POS.count('N') ==2:
+
+
+
+	# 				curContext.append(word_POS)
+				
+	# 			testIndices=[i for i in range(1,9)]
+				
+
+	# 			# print curContext
+	# 			# 	curContext.append(str(docDict[item][wordColIndex])+"/"+str(docDict[item][POSColIndex])
+	# 			sentDict=dict(zip(testIndices, curContext)) #
+	# 			# sentSyntax=[i for i in sentDict[i][2]]
+	# 			sentSyntax=[]
+
+	# 			for i in range (1,len(sentDict)+1):  #Gives the items in the syntax a number in order and adds it to its dictionary entry
+	# 				sentSyntax.extend(sentDict[i][2])
+	# 			# if sentSyntax[1]=="P":
+	# 			# 	break
+	# 			# for item in sentSyntax:
+	# 			# 	", ".join(map(item, sentSyntax))
+	# 			sentSyntax=",".join(sentSyntax)
+				
+	# 			# print type(sentSyntax)
+	# 			# print type(sentSyntax[0])
+	# 			# sentSyntax.strip(["'"])					
+	# 			# print sentSyntax
+	# 			# print sentDict
+	# 			if any(item in sentSyntax for item in LegalSyntaxList):
+					
+	# 				if sentSyntax[1]!="P":
+	# 					wordPOSlist=[]
+	# 					for item in curContext:
+	# 						for x, word in enumerate(item):
+								
+							
+	# 							if x==1:
+									
+	# 								tempPOS=word
+	# 								tempPOS="("+word+")"
+	# 								wordPOSlist.append(tempPOS)
+	# 							if x==0:
+	# 								wordPOSlist.append(word)
+
+	# 					wordPOSlist=" ".join(wordPOSlist)
+	# 					wordPOSlist=wordPOSlist.replace(" (", "(")
+	# 					strippedSyntax=sentSyntax.replace(",","")
+
+	# 					matches.append(sentSyntax)
+	# 					output=strippedSyntax+","+wordPOSlist+'\n'
+	# 					outputFile.write(str(output))
+
+	# 				# print curContext
+	# 				# print sentSyntax[2:]
+
+	# timeEndFile=time.time()
+	# timeElapsed=str(timeEndFile-startTime)			
+	# print "Analyzed in:"+timeElapsed+" seconds"
 				#need to find out if the the result contains any items in my list
 				# if sentSyntax contains 2 N, 
 				# ### JUST NOUNS!
